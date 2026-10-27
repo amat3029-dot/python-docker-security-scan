@@ -22,7 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# Patch Alpine packages, then remove pip/setuptools/wheel (and pip's vendored libs) from the base image
+# Patch Alpine packages and remove pip/setuptools/wheel (and pip's vendored libs)
 RUN apk upgrade --no-cache \
     && python -m pip uninstall -y pip setuptools wheel || true
 
