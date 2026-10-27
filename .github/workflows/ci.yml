@@ -37,7 +37,63 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: sample-test:${{ github.sha }}
-          format: table
+          format: json
+          output: trivy-results.json
           severity: CRITICAL,HIGH,MEDIUM,LOW
           exit-code: "0"
           ignore-unfixed: false
+
+      - name: Display vulnerability report and counts
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from collections import Counter
+
+          path = "trivy-results.json"
+
+          if not os.path.exists(path):
+              print("ERROR: Trivy report not found.")
+              raise SystemExit(0)
+
+          with open(path, encoding="utf-8") as f:
+              report = json.load(f)
+
+          findings = []
+
+          for result in report.get("Results") or []:
+              for vuln in result.get("Vulnerabilities") or []:
+                  findings.append({
+                      "Severity": vuln.get("Severity", "UNKNOWN"),
+                      "CVE": vuln.get("VulnerabilityID", ""),
+                      "Package": vuln.get("PkgName", ""),
+                      "Installed": vuln.get("InstalledVersion", ""),
+                      "Fixed": vuln.get("FixedVersion") or "No fix available",
+                      "Title": vuln.get("Title", ""),
+                  })
+
+          headers = [
+              "Severity", "CVE", "Package",
+              "Installed", "Fixed", "Title"
+          ]
+
+          print("\n=== DOCKER IMAGE VULNERABILITY REPORT ===")
+
+          if findings:
+              print(" | ".join(headers))
+              print("-" * 120)
+
+              for item in findings:
+                  print(" | ".join(str(item[h]) for h in headers))
+          else:
+              print("No vulnerabilities found.")
+
+          counts = Counter(item["Severity"] for item in findings)
+
+          print("\n=== VULNERABILITY SUMMARY ===")
+          for severity in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+              print(f"{severity:8}: {counts[severity]}")
+
+          print(f"{'TOTAL':8}: {len(findings)}")
+          PY
